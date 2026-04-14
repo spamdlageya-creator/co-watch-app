@@ -3,171 +3,253 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Co-Watch Pro</title>
+    <title>Co-Watch | Совместный просмотр</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
     <style>
-        .hidden-ui { opacity: 0; pointer-events: none; transform: translateY(10px); }
-        .visible-ui { opacity: 1; pointer-events: auto; transform: translateY(0); transition: all 0.4s ease; }
-        .message-reaction { transition: transform 0.2s; }
-        .message-reaction:active { transform: scale(1.4); }
+        /* Скрываем скроллбар */
+        #chat-messages::-webkit-scrollbar { width: 4px; }
+        #chat-messages::-webkit-scrollbar-thumb { background-color: #4B5563; border-radius: 4px; }
+        
+        /* Стилизация ползунка громкости */
+        input[type=range] { accent-color: #6366f1; }
+        
+        /* Исправление для iOS/Mobile: чтобы страница не прыгала */
+        body { position: fixed; width: 100%; height: 100%; }
     </style>
 </head>
-<body class="bg-black text-white overflow-hidden h-[100dvh] w-screen">
+<body class="bg-gray-900 text-white font-sans overflow-hidden">
 
-    <div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 p-6">
-        <div class="w-full max-w-sm bg-gray-800 p-8 rounded-2xl border border-gray-700">
-            <h2 class="text-2xl font-bold mb-6 text-indigo-400">Co-Watch <span class="text-xs font-normal text-gray-400">v2.1</span></h2>
-            <input type="text" id="nickname" class="w-full p-3 bg-gray-900 rounded-lg mb-4 border border-gray-700" placeholder="Ваш ник">
-            <button id="btn-create" class="w-full bg-indigo-600 py-3 rounded-lg font-bold mb-4">Создать комнату</button>
-            <div class="text-center text-xs text-gray-500 mb-4">ИЛИ</div>
-            <input type="text" id="admin-nickname" class="w-full p-3 bg-gray-900 rounded-lg mb-4 border border-gray-700" placeholder="Ник админа">
-            <button id="btn-join" class="w-full bg-emerald-600 py-3 rounded-lg font-bold">Присоединиться</button>
+    <div id="login-screen" class="w-full h-full flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-md bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700">
+            <h1 class="text-3xl font-bold mb-6 text-center text-indigo-400"><i class="fa-solid fa-popcorn mb-2 block text-4xl"></i>Co-Watch</h1>
+            
+            <div class="mb-4">
+                <input type="text" id="nickname" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-indigo-500 transition" placeholder="Ваш никнейм">
+            </div>
+
+            <button id="btn-create" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition mb-4 shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid fa-tower-broadcast mr-2"></i> Создать комнату
+            </button>
+
+            <div class="relative flex py-3 items-center">
+                <div class="flex-grow border-t border-gray-700"></div>
+                <span class="flex-shrink-0 mx-4 text-gray-500 text-sm font-medium">ИЛИ</span>
+                <div class="flex-grow border-t border-gray-700"></div>
+            </div>
+
+            <div class="mb-4 mt-2">
+                <input type="text" id="admin-nickname" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-green-500 transition" placeholder="Никнейм админа">
+            </div>
+
+            <button id="btn-join" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-lg shadow-emerald-500/30">
+                <i class="fa-solid fa-right-to-bracket mr-2"></i> Присоединиться
+            </button>
         </div>
     </div>
 
-    <div id="room-screen" class="hidden h-full flex flex-col md:flex-row overflow-hidden">
+    <div id="room-screen" class="hidden w-full h-full flex flex-col md:flex-row">
         
-        <div id="video-container" class="relative w-full aspect-video md:aspect-auto md:h-full md:flex-grow bg-black shrink-0 group overflow-hidden">
-            <video id="video-player" class="w-full h-full object-contain bg-black" playsinline></video>
+        <div id="video-container" class="relative flex-grow bg-black flex flex-col h-[60vh] md:h-full group">
             
-            <button id="btn-mobile-play" class="hidden absolute inset-0 m-auto w-24 h-24 bg-indigo-600/90 rounded-full text-white flex flex-col items-center justify-center z-50 backdrop-blur shadow-2xl">
-                <i class="fa-solid fa-play text-3xl mb-1"></i>
-                <span class="text-xs font-bold">Смотреть</span>
-            </button>
+            <div class="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 to-transparent z-10 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div id="room-info" class="bg-gray-800/80 backdrop-blur px-3 py-1.5 rounded-md text-sm font-medium border border-gray-600"></div>
+                <button id="btn-share" class="hidden bg-indigo-600 hover:bg-indigo-500 text-sm px-4 py-2 rounded-md font-bold transition shadow-lg">
+                    <i class="fa-solid fa-display mr-2"></i>Транслировать
+                </button>
+            </div>
             
-            <div id="ui-overlay" class="visible-ui absolute inset-0 flex flex-col justify-between p-4 pointer-events-none z-10">
-                <div class="flex justify-between items-start pointer-events-auto">
-                    <div class="flex flex-col gap-2">
-                        <div id="live-badge" class="hidden bg-red-600 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 animate-pulse">
-                            <span class="w-1.5 h-1.5 bg-white rounded-full"></span> В ЭФИРЕ
-                        </div>
-                        <div class="bg-black/50 backdrop-blur px-3 py-1 rounded text-xs">
-                            <i class="fa-solid fa-eye mr-1"></i> <span id="viewer-count">0</span>
-                        </div>
-                    </div>
-                    <button id="btn-share" class="hidden bg-indigo-600 px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-indigo-500/40">Транслировать</button>
+            <video id="video-player" class="w-full h-full object-contain" autoplay playsinline></video>
+            
+            <div id="waiting-text" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500 pointer-events-none">
+                <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-3 text-indigo-500"></i>
+                <span class="text-lg font-medium">Ожидание трансляции...</span>
+            </div>
+
+            <div id="video-controls" class="hidden absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 to-transparent z-10 flex items-center justify-end gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                
+                <div id="volume-control" class="flex items-center gap-2 bg-gray-800/80 backdrop-blur px-3 py-1.5 rounded-full border border-gray-600">
+                    <i class="fa-solid fa-volume-high text-sm text-gray-300"></i>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1" class="w-20 md:w-24 cursor-pointer">
                 </div>
 
-                <div class="flex justify-end gap-3 pointer-events-auto">
-                    <div id="volume-wrapper" class="flex items-center bg-black/50 backdrop-blur px-3 py-2 rounded-full border border-white/10 hidden md:flex">
-                        <i class="fa-solid fa-volume-low text-xs mr-2"></i>
-                        <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="1" class="w-20">
-                    </div>
-                    <button id="btn-fullscreen" class="bg-black/50 backdrop-blur w-10 h-10 rounded-full flex items-center justify-center border border-white/10">
-                        <i class="fa-solid fa-expand"></i>
-                    </button>
-                </div>
+                <button id="btn-fullscreen" class="bg-gray-800/80 hover:bg-gray-700 backdrop-blur p-2.5 rounded-full border border-gray-600 transition text-gray-200">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
             </div>
         </div>
 
-        <div id="chat-sidebar" class="w-full flex-grow md:w-80 lg:w-96 bg-gray-900 flex flex-col border-t md:border-t-0 md:border-l border-gray-800 min-h-0 transition-all duration-300">
-            <div id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4"></div>
-            
-            <div id="reply-preview" class="hidden px-4 py-2 bg-gray-800 border-t border-indigo-500 flex justify-between items-center text-xs">
-                <span id="reply-text" class="truncate italic text-gray-400"></span>
-                <button id="cancel-reply" class="text-red-400 px-2 text-lg"><i class="fa-solid fa-xmark"></i></button>
+        <div class="w-full h-[40vh] md:h-full md:w-80 lg:w-96 bg-gray-800 flex flex-col border-t md:border-t-0 md:border-l border-gray-700">
+            <div class="p-3 bg-gray-900 border-b border-gray-700 flex items-center gap-2">
+                <i class="fa-regular fa-comments text-indigo-400"></i>
+                <span class="font-bold text-sm">Чат</span>
             </div>
+            
+            <div id="chat-messages" class="flex-grow p-4 overflow-y-auto flex flex-col gap-3">
+                </div>
 
-            <form id="chat-form" class="p-3 bg-gray-800 flex gap-2 shrink-0">
-                <input type="text" id="chat-input" class="flex-grow bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" placeholder="Сообщение..." autocomplete="off">
-                <button class="text-indigo-500 text-xl px-2"><i class="fa-solid fa-paper-plane"></i></button>
-            </form>
+            <div class="p-3 bg-gray-900 border-t border-gray-700">
+                <form id="chat-form" class="flex gap-2 relative">
+                    <input type="text" id="chat-input" class="flex-grow p-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm focus:outline-none focus:border-indigo-500 transition pr-10" placeholder="Написать..." autocomplete="off">
+                    <button type="submit" class="absolute right-1 top-1 bottom-1 text-indigo-400 hover:text-indigo-300 p-2 rounded transition">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
     <script>
         const socket = io();
-        let myName = localStorage.getItem('co-watch-nick') || '';
+        
+        let myName = '';
         let roomName = '';
         let isAdmin = false;
-        let replyingTo = null;
-        let idleTimer;
-        
-        // WebRTC переменные
         let localStream = null;
         const peers = {};
-        let peerForViewer = null;
 
-        // Инициализация ника
-        if(myName) document.getElementById('nickname').value = myName;
-
-        const uiOverlay = document.getElementById('ui-overlay');
+        // DOM элементы
+        const loginScreen = document.getElementById('login-screen');
+        const roomScreen = document.getElementById('room-screen');
+        const videoContainer = document.getElementById('video-container');
         const videoPlayer = document.getElementById('video-player');
+        const waitingText = document.getElementById('waiting-text');
+        const btnShare = document.getElementById('btn-share');
         const chatMessages = document.getElementById('chat-messages');
-        const btnMobilePlay = document.getElementById('btn-mobile-play');
+        const videoControls = document.getElementById('video-controls');
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeControlWrapper = document.getElementById('volume-control');
 
-        // --- Умный Fullscreen ---
-        function resetIdleTimer() {
-            uiOverlay.classList.remove('hidden-ui');
-            uiOverlay.classList.add('visible-ui');
-            clearTimeout(idleTimer);
-            if (document.fullscreenElement || window.innerWidth < 768) {
-                idleTimer = setTimeout(() => {
-                    uiOverlay.classList.remove('visible-ui');
-                    uiOverlay.classList.add('hidden-ui');
-                }, 3000);
-            }
+        // --- Звуковое уведомление (генерация звука кодом, без файлов) ---
+        function playBeep() {
+            // Проигрываем только если вкладка активна (как просили в задании)
+            if (document.hidden) return; 
+
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime); // Нота Ля
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);     // Громкость
+                osc.start();
+                gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.15); // Затухание
+                osc.stop(ctx.currentTime + 0.15);
+            } catch(e) { console.log("Audio API не поддерживается"); }
         }
-        ['mousemove', 'touchstart', 'keydown'].forEach(ev => window.addEventListener(ev, resetIdleTimer));
 
         // --- Вход ---
-        document.getElementById('btn-create').onclick = () => login(true);
-        document.getElementById('btn-join').onclick = () => login(false);
-
-        function login(create) {
+        document.getElementById('btn-create').addEventListener('click', () => {
             myName = document.getElementById('nickname').value.trim();
-            if(!myName) return alert("Введите ник");
-            localStorage.setItem('co-watch-nick', myName);
+            if (!myName) return alert('Введите ваш ник!');
             
-            isAdmin = create;
-            roomName = create ? myName : document.getElementById('admin-nickname').value.trim();
+            isAdmin = true;
+            roomName = myName;
+            socket.emit('create-room', roomName);
             
-            socket.emit(create ? 'create-room' : 'join-room', roomName, myName);
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('room-screen').classList.remove('hidden');
-            if(isAdmin) document.getElementById('btn-share').classList.remove('hidden');
-        }
-
-        // --- Полный WebRTC движок ---
-        const peerOptions = (stream) => ({
-            initiator: isAdmin,
-            stream: stream,
-            trickle: true,
-            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+            enterRoomUI();
+            btnShare.classList.remove('hidden');
+            volumeControlWrapper.classList.add('hidden'); // Админу не нужен ползунок громкости стрима
+            videoPlayer.muted = true; // Админ не должен слышать сам себя (эхо)
         });
 
-        // Кнопка трансляции (только для Админа)
-        document.getElementById('btn-share').onclick = async () => {
-            try {
-                localStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { frameRate: { ideal: 30, max: 60 }, contentHint: 'motion' },
-                    audio: true
-                });
-                videoPlayer.srcObject = localStream;
-                videoPlayer.muted = true;
-                videoPlayer.play();
-                document.getElementById('live-badge').classList.remove('hidden');
-                
-                // Если кто-то уже подключен, но ждал стрима (надежность соединения)
-                Object.values(peers).forEach(p => {
-                    if(!p.destroyed) localStream.getTracks().forEach(t => p.addTrack(t, localStream));
-                });
-            } catch(e) { console.error("Ошибка трансляции:", e); }
-        };
+        document.getElementById('btn-join').addEventListener('click', () => {
+            myName = document.getElementById('nickname').value.trim();
+            roomName = document.getElementById('admin-nickname').value.trim();
+            
+            if (!myName || !roomName) return alert('Введите свой ник и ник админа!');
+            
+            isAdmin = false;
+            socket.emit('join-room', roomName, myName);
+            enterRoomUI();
+        });
 
-        // Обработка подключений зрителей
+        function enterRoomUI() {
+            loginScreen.classList.add('hidden');
+            roomScreen.classList.remove('hidden');
+            document.getElementById('room-info').innerHTML = `<i class="fa-solid fa-users mr-2 text-indigo-400"></i> ${roomName}`;
+        }
+
+        // --- Управление Видео ---
+        
+        // Трансляция экрана со ЗВУКОМ
+        btnShare.addEventListener('click', async () => {
+            try {
+                // Захватываем видео и аудио
+                localStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "always" },
+                    audio: true 
+                });
+                
+                videoPlayer.srcObject = localStream;
+                waitingText.classList.add('hidden');
+                btnShare.classList.add('hidden');
+                videoControls.classList.remove('hidden');
+
+                localStream.getVideoTracks()[0].onended = () => {
+                    btnShare.classList.remove('hidden');
+                    videoControls.classList.add('hidden');
+                    waitingText.classList.remove('hidden');
+                };
+            } catch (err) {
+                console.error("Ошибка захвата:", err);
+                alert("Чтобы передавать звук, в окне выбора браузера не забудьте поставить галочку 'Поделиться аудио'!");
+            }
+        });
+
+        // Ползунок громкости
+        volumeSlider.addEventListener('input', (e) => {
+            videoPlayer.volume = e.target.value;
+        });
+
+        // Полноэкранный режим
+        document.getElementById('btn-fullscreen').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                videoContainer.requestFullscreen().catch(err => {
+                    console.error("Ошибка при переходе в Fullscreen:", err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        // Меняем иконку Fullscreen
+        document.addEventListener('fullscreenchange', () => {
+            const icon = document.querySelector('#btn-fullscreen i');
+            if (document.fullscreenElement) {
+                icon.classList.remove('fa-expand');
+                icon.classList.add('fa-compress');
+            } else {
+                icon.classList.remove('fa-compress');
+                icon.classList.add('fa-expand');
+            }
+        });
+
+        // --- WebRTC ---
         socket.on('user-joined', (userId, userName) => {
+            addSystemMessage(`${userName} зашел в комнату`);
+            
             if (isAdmin && localStream) {
-                const peer = new SimplePeer(peerOptions(localStream));
-                peer.on('signal', signalData => socket.emit('signal', userId, signalData));
+                const peer = new SimplePeer({
+                    initiator: true,
+                    stream: localStream, // Передаем поток (видео + аудио)
+                    trickle: true
+                });
+
+                peer.on('signal', signalData => {
+                    socket.emit('signal', userId, signalData);
+                });
+
                 peers[userId] = peer;
             }
         });
 
-        // Сигналинг для пробития через STUN
+        let peerForViewer = null;
+
         socket.on('signal', (fromId, signalData) => {
             if (isAdmin) {
                 if (peers[fromId]) peers[fromId].signal(signalData);
@@ -175,109 +257,60 @@
                 if (!peerForViewer) {
                     peerForViewer = new SimplePeer({
                         initiator: false,
-                        trickle: true,
-                        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+                        trickle: true
                     });
-                    
-                    peerForViewer.on('signal', signalData => socket.emit('signal', fromId, signalData));
-                    
+
+                    peerForViewer.on('signal', signalData => {
+                        socket.emit('signal', fromId, signalData);
+                    });
+
+                    // Получение потока со звуком
                     peerForViewer.on('stream', stream => {
                         videoPlayer.srcObject = stream;
-                        
-                        // ХАК ДЛЯ МОБИЛОК: Пробуем запустить. Если заблочено - показываем кнопку
-                        videoPlayer.play().catch(() => {
-                            btnMobilePlay.classList.remove('hidden');
-                            btnMobilePlay.onclick = () => {
-                                videoPlayer.play();
-                                btnMobilePlay.classList.add('hidden');
-                            };
-                        });
+                        waitingText.classList.add('hidden');
+                        videoControls.classList.remove('hidden');
                     });
                 }
                 peerForViewer.signal(signalData);
             }
         });
 
-        // --- Чат с ответами и реакциями ---
-        document.getElementById('chat-form').onsubmit = (e) => {
+        // --- Чат ---
+        document.getElementById('chat-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const input = document.getElementById('chat-input');
-            const val = input.value.trim();
-            if(!val) return;
+            const msg = input.value.trim();
+            if (msg) {
+                socket.emit('chat-message', roomName, myName, msg);
+                input.value = '';
+            }
+        });
 
-            socket.emit('chat-message', roomName, { id: Date.now(), user: myName, text: val, replyTo: replyingTo });
-            input.value = '';
-            cancelReply();
-        };
-
-        socket.on('chat-message', (data) => {
+        socket.on('chat-message', (userName, message) => {
             const div = document.createElement('div');
-            div.className = "bg-gray-800 p-3 rounded-xl relative group border border-transparent hover:border-gray-600";
-            div.onclick = () => setReply(data);
+            const isMe = userName === myName;
             
-            let replyHtml = data.replyTo ? `<div class="text-[10px] text-gray-400 border-l-2 border-indigo-500 pl-2 mb-1 truncate">Ответ: ${data.replyTo.text}</div>` : '';
-            
+            // Проигрываем звук, только если сообщение НЕ от нас самих
+            if (!isMe) playBeep();
+
+            div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
             div.innerHTML = `
-                ${replyHtml}
-                <div class="text-xs font-bold text-indigo-400 mb-1">${data.user}</div>
-                <div class="text-sm text-gray-100">${data.text}</div>
-                <div class="flex gap-2 mt-2">
-                    <button onclick="event.stopPropagation(); react('${data.id}', '👍')" class="message-reaction text-xs grayscale hover:grayscale-0 opacity-50 hover:opacity-100">👍</button>
-                    <button onclick="event.stopPropagation(); react('${data.id}', '😂')" class="message-reaction text-xs grayscale hover:grayscale-0 opacity-50 hover:opacity-100">😂</button>
-                    <button onclick="event.stopPropagation(); react('${data.id}', '🔥')" class="message-reaction text-xs grayscale hover:grayscale-0 opacity-50 hover:opacity-100">🔥</button>
+                <span class="text-xs mb-1 ${isMe ? 'text-indigo-400' : 'text-emerald-400'} font-bold">${userName}</span>
+                <div class="px-3 py-2 rounded-lg max-w-[90%] break-words ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-700 text-gray-200 rounded-bl-none'}">
+                    ${message}
                 </div>
-                <div id="reactions-${data.id}" class="flex gap-1 mt-1"></div>
             `;
             chatMessages.appendChild(div);
             chatMessages.scrollTop = chatMessages.scrollHeight;
-            if(data.user !== myName && !document.hidden) new Audio('https://www.soundjay.com/buttons/beep-07a.mp3').play().catch(()=>{});
         });
 
-        window.react = (id, emoji) => socket.emit('add-reaction', roomName, id, emoji);
-
-        socket.on('update-reaction', ({ messageId, emoji }) => {
-            const container = document.getElementById(`reactions-${messageId}`);
-            if(!container) return;
-            const existing = Array.from(container.children).find(c => c.dataset.emoji === emoji);
-            if(existing) {
-                existing.innerText = `${emoji} ${parseInt(existing.innerText.split(' ')[1]) + 1}`;
-            } else {
-                const span = document.createElement('span');
-                span.dataset.emoji = emoji;
-                span.className = "text-[10px] bg-gray-700 px-1.5 py-0.5 rounded-full";
-                span.innerText = `${emoji} 1`;
-                container.appendChild(span);
-            }
-        });
-
-        function setReply(data) {
-            replyingTo = data;
-            document.getElementById('reply-preview').classList.remove('hidden');
-            document.getElementById('reply-text').innerText = `${data.user}: ${data.text}`;
-            document.getElementById('chat-input').focus();
+        function addSystemMessage(text) {
+            const div = document.createElement('div');
+            div.className = "flex justify-center my-1";
+            div.innerHTML = `<span class="bg-gray-700/50 text-gray-400 text-xs px-2 py-1 rounded-full">${text}</span>`;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
-
-        function cancelReply() {
-            replyingTo = null;
-            document.getElementById('reply-preview').classList.add('hidden');
-        }
-        document.getElementById('cancel-reply').onclick = (e) => { e.stopPropagation(); cancelReply(); };
-
-        // --- Статистика и кнопки ---
-        socket.on('room-stats', ({ viewerCount }) => {
-            document.getElementById('viewer-count').innerText = viewerCount;
-        });
-
-        document.getElementById('btn-fullscreen').onclick = () => {
-            if (!document.fullscreenElement) {
-                document.getElementById('video-container').requestFullscreen().catch(()=>{});
-            } else {
-                document.exitFullscreen();
-            }
-        };
-
-        const volumeSlider = document.getElementById('volume-slider');
-        if(volumeSlider) volumeSlider.oninput = (e) => videoPlayer.volume = e.target.value;
     </script>
 </body>
 </html>
