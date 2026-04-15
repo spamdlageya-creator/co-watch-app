@@ -18,7 +18,9 @@
         .hidden-ui { opacity: 0 !important; pointer-events: none; }
     </style>
 </head>
-<body class="bg-gray-900 text-white font-sans overflow-hidden" oncontextmenu="return false;"> <div id="ctx-menu" class="hidden fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-[200] py-1 text-sm">
+<body class="bg-gray-900 text-white font-sans overflow-hidden" oncontextmenu="return false;"> 
+
+    <div id="ctx-menu" class="hidden fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-[200] py-1 text-sm">
         <button id="btn-kick" class="w-full text-left px-4 py-2 text-red-400 hover:bg-gray-700 hover:text-red-300 font-bold">
             <i class="fa-solid fa-ban mr-2"></i>Выгнать
         </button>
@@ -60,9 +62,15 @@
             
             <div id="ui-top" class="fade-ui absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 to-transparent z-10 flex justify-between items-center opacity-100 md:opacity-0 md:group-hover:opacity-100">
                 <div id="room-info" class="bg-gray-800/80 backdrop-blur px-3 py-1.5 rounded-md text-sm font-medium border border-gray-600"></div>
-                <button id="btn-share" class="hidden bg-indigo-600 hover:bg-indigo-500 text-sm px-4 py-2 rounded-md font-bold transition shadow-lg">
-                    <i class="fa-solid fa-display mr-2"></i>Транслировать
-                </button>
+                
+                <div id="share-controls" class="hidden flex gap-2">
+                    <button id="btn-share-screen" class="bg-indigo-600 hover:bg-indigo-500 text-sm px-4 py-2 rounded-md font-bold transition shadow-lg" title="Транслировать экран">
+                        <i class="fa-solid fa-desktop md:mr-2"></i><span class="hidden md:inline">Экран</span>
+                    </button>
+                    <button id="btn-share-cam" class="bg-indigo-600 hover:bg-indigo-500 text-sm px-4 py-2 rounded-md font-bold transition shadow-lg" title="Транслировать камеру">
+                        <i class="fa-solid fa-camera md:mr-2"></i><span class="hidden md:inline">Камера</span>
+                    </button>
+                </div>
             </div>
             
             <video id="video-player" class="w-full h-full object-contain" autoplay playsinline></video>
@@ -72,11 +80,23 @@
                 <span class="text-lg font-medium">Ожидание трансляции...</span>
             </div>
 
-            <div id="video-controls" class="fade-ui hidden absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 to-transparent z-10 flex items-center justify-end gap-4 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+            <div id="video-controls" class="fade-ui hidden absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 to-transparent z-10 flex items-center justify-end gap-3 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                
+                <div id="quality-control" class="hidden flex items-center gap-2 bg-gray-800/80 backdrop-blur px-2 py-1.5 rounded border border-gray-600">
+                    <i class="fa-solid fa-gear text-sm text-gray-300"></i>
+                    <select id="quality-selector" class="bg-transparent text-xs text-white outline-none cursor-pointer">
+                        <option value="1080">1080p</option>
+                        <option value="720">720p</option>
+                        <option value="480" selected>480p</option>
+                        <option value="360">360p</option>
+                    </select>
+                </div>
+
                 <div id="volume-control" class="flex items-center gap-2 bg-gray-800/80 backdrop-blur px-3 py-1.5 rounded-full border border-gray-600">
                     <i class="fa-solid fa-volume-high text-sm text-gray-300"></i>
                     <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1" class="w-20 md:w-24 cursor-pointer">
                 </div>
+                
                 <button id="btn-fullscreen" class="bg-gray-800/80 hover:bg-gray-700 backdrop-blur p-2.5 rounded-full border border-gray-600 transition text-gray-200">
                     <i class="fa-solid fa-expand"></i>
                 </button>
@@ -89,7 +109,7 @@
                 <span class="font-bold text-sm">Чат</span>
             </div>
             
-            <div id="chat-messages" class="flex-grow p-4 overflow-y-auto flex flex-col gap-3 pb-20 md:pb-4 relative"></div>
+            <div id="chat-messages" class="flex-grow p-4 overflow-y-auto flex flex-col pb-20 md:pb-4 relative"></div>
 
             <div class="p-3 bg-gray-900 border-t border-gray-700 shrink-0">
                 <form id="chat-form" class="flex gap-2 relative">
@@ -124,6 +144,9 @@
         const roomScreen = document.getElementById('room-screen');
         const videoPlayer = document.getElementById('video-player');
         const chatMessages = document.getElementById('chat-messages');
+        const uiBot = document.getElementById('video-controls');
+        const qualityControl = document.getElementById('quality-control');
+        const qualitySelector = document.getElementById('quality-selector');
 
         // --- УВЕДОМЛЕНИЯ ---
         function showError(msg) {
@@ -143,13 +166,11 @@
         // --- MOBILE UI AUTO-HIDE ---
         let uiTimeout;
         const uiTop = document.getElementById('ui-top');
-        const uiBot = document.getElementById('video-controls');
         
         function resetUiTimer() {
             uiTop.classList.remove('hidden-ui');
             uiBot.classList.remove('hidden-ui');
             clearTimeout(uiTimeout);
-            // Прячем через 3 секунды, если экран мобильный или развернут на весь экран
             if (window.innerWidth < 768 || document.fullscreenElement) {
                 uiTimeout = setTimeout(() => {
                     uiTop.classList.add('hidden-ui');
@@ -183,14 +204,15 @@
             roomScreen.classList.remove('hidden');
             document.getElementById('room-info').innerHTML = `<i class="fa-solid fa-users mr-2 text-indigo-400"></i> ${roomName}`;
             if (isCreator) {
-                document.getElementById('btn-share').classList.remove('hidden');
-                document.getElementById('volume-control').classList.add('hidden');
+                document.getElementById('share-controls').classList.remove('hidden');
+                document.getElementById('volume-control').classList.add('hidden'); // Админу не нужна своя громкость
+                qualityControl.classList.remove('hidden'); // Показываем выбор качества админу
                 videoPlayer.muted = true;
             }
             resetUiTimer();
         });
 
-        // --- ТРАНСЛЯЦИЯ (Очистка зависшего кадра) ---
+        // --- ТРАНСЛЯЦИЯ ---
         async function stopMyStream() {
             if (localStream) {
                 localStream.getTracks().forEach(t => t.stop());
@@ -199,17 +221,31 @@
             }
         }
 
-        document.getElementById('btn-share').addEventListener('click', async () => {
+        // Общая функция старта стрима (камера или экран)
+        async function startStream(type) {
             try {
-                if (localStream) await stopMyStream(); // Останавливаем старый перед выбором нового
+                if (localStream) await stopMyStream(); 
                 
-                localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                const idealHeight = parseInt(qualitySelector.value);
+
+                if (type === 'screen') {
+                    localStream = await navigator.mediaDevices.getDisplayMedia({ 
+                        video: { height: { ideal: idealHeight } }, 
+                        audio: true 
+                    });
+                } else if (type === 'camera') {
+                    localStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { height: { ideal: idealHeight } }, 
+                        audio: true 
+                    });
+                }
+
                 videoPlayer.srcObject = localStream;
                 document.getElementById('waiting-text').classList.add('hidden');
-                document.getElementById('btn-share').classList.add('hidden');
+                document.getElementById('share-controls').classList.add('hidden');
                 uiBot.classList.remove('hidden');
 
-                // Если уже есть зрители, заменяем им трек на лету
+                // Обновляем треки у зрителей на лету
                 Object.keys(peers).forEach(id => {
                     if (peers[id] && !peers[id].destroyed) {
                         try { peers[id].replaceTrack(peers[id].streams[0].getVideoTracks()[0], localStream.getVideoTracks()[0], peers[id].streams[0]); } catch(e){}
@@ -218,13 +254,31 @@
 
                 localStream.getVideoTracks()[0].onended = () => {
                     stopMyStream();
-                    document.getElementById('btn-share').classList.remove('hidden');
+                    document.getElementById('share-controls').classList.remove('hidden');
                     uiBot.classList.add('hidden');
                     document.getElementById('waiting-text').classList.remove('hidden');
                     videoPlayer.srcObject = null;
                 };
             } catch (err) {
-                console.log(err);
+                showError('Ошибка доступа к медиа');
+                console.error(err);
+            }
+        }
+
+        document.getElementById('btn-share-screen').addEventListener('click', () => startStream('screen'));
+        document.getElementById('btn-share-cam').addEventListener('click', () => startStream('camera'));
+
+        // Смена качества на лету
+        qualitySelector.addEventListener('change', async (e) => {
+            if (localStream && isAdmin) {
+                const height = parseInt(e.target.value);
+                const track = localStream.getVideoTracks()[0];
+                try {
+                    await track.applyConstraints({ height: { ideal: height } });
+                    addSystemMessage(`Качество трансляции изменено на ${height}p`, 'text-blue-400');
+                } catch (err) {
+                    showError('Браузер не поддерживает смену качества на лету');
+                }
             }
         });
 
@@ -273,7 +327,7 @@
             }
         });
 
-        // --- ЧАТ (Группировка) ---
+        // --- ЧАТ (Группировка с отступами) ---
         document.getElementById('chat-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const input = document.getElementById('chat-input');
@@ -285,38 +339,41 @@
 
         socket.on('chat-message', (data) => {
             const isMe = data.user === myName;
+            const isGroup = lastMsgAuthor === data.user;
             
-            // Если пишет тот же человек, добавляем текст в старый блок
-            if (lastMsgAuthor === data.user && chatMessages.lastElementChild && chatMessages.lastElementChild.classList.contains('chat-msg-block')) {
-                const contentBox = chatMessages.lastElementChild.querySelector('.msg-content');
-                const newText = document.createElement('div');
-                newText.className = `mt-1 pt-1 border-t ${isMe ? 'border-indigo-500' : 'border-gray-600'}`;
-                newText.innerText = data.text;
-                contentBox.appendChild(newText);
-            } else {
-                // Иначе создаем новый блок (с data-атрибутами для кика)
-                const div = document.createElement('div');
-                div.className = `chat-msg-block flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
-                div.dataset.id = data.id;
-                div.dataset.user = data.user;
+            const div = document.createElement('div');
+            // Если сообщение в группе (от того же человека подряд) — отступ 2px (mt-0.5), иначе большой отступ (mt-3)
+            div.className = `chat-msg-block flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isGroup ? 'mt-1' : 'mt-4'}`;
+            div.dataset.id = data.id;
+            div.dataset.user = data.user;
 
-                div.innerHTML = `
-                    <span class="text-[10px] mb-1 ${isMe ? 'text-indigo-400' : 'text-emerald-400'} font-bold uppercase">${data.user}</span>
-                    <div class="msg-content px-3 py-2 rounded-lg max-w-[90%] break-words ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-700 text-gray-200 rounded-bl-none'}">
-                        <div>${data.text}</div>
-                    </div>
-                `;
-                chatMessages.appendChild(div);
+            let nickHTML = '';
+            // Ник показываем только если это первое сообщение в группе
+            if (!isGroup) {
+                nickHTML = `<span class="text-[10px] mb-1 ${isMe ? 'text-indigo-400' : 'text-emerald-400'} font-bold uppercase">${data.user}</span>`;
             }
+
+            // Радиусы тоже меняем: чтобы был красивый пузырьковый эффект
+            const radiusClasses = isMe 
+                ? (isGroup ? 'rounded-l-lg rounded-r-md' : 'rounded-lg rounded-br-none') 
+                : (isGroup ? 'rounded-r-lg rounded-l-md' : 'rounded-lg rounded-bl-none');
+
+            div.innerHTML = `
+                ${nickHTML}
+                <div class="msg-content px-3 py-2 max-w-[90%] break-words ${isMe ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-200'} ${radiusClasses}">
+                    <div>${data.text}</div>
+                </div>
+            `;
+            chatMessages.appendChild(div);
             
             lastMsgAuthor = data.user;
             chatMessages.scrollTop = chatMessages.scrollHeight;
         });
 
         function addSystemMessage(text, colorClass = 'text-gray-400') {
-            lastMsgAuthor = null; // Сбрасываем группировку после системного сообщения
+            lastMsgAuthor = null; // Сбрасываем группировку
             const div = document.createElement('div');
-            div.className = "flex justify-center my-1";
+            div.className = "flex justify-center mt-3";
             div.innerHTML = `<span class="bg-gray-700/50 ${colorClass} text-[10px] px-3 py-1 rounded-full text-center uppercase font-bold">${text}</span>`;
             chatMessages.appendChild(div);
             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -327,8 +384,8 @@
         const ctxMenu = document.getElementById('ctx-menu');
 
         chatMessages.addEventListener('contextmenu', (e) => {
-            e.preventDefault(); // Убираем стандартное меню браузера
-            if (!isAdmin) return; // Меню кика только для админа
+            e.preventDefault(); 
+            if (!isAdmin) return; 
 
             const msgBlock = e.target.closest('.chat-msg-block');
             if (!msgBlock) return;
@@ -336,22 +393,19 @@
             const id = msgBlock.dataset.id;
             const user = msgBlock.dataset.user;
             
-            if (id === socket.id || user === myName) return; // Себя кикнуть нельзя
+            if (id === socket.id || user === myName) return; 
 
             targetKickId = id;
             
-            // Позиционируем меню
             ctxMenu.style.top = `${e.clientY}px`;
             ctxMenu.style.left = `${e.clientX}px`;
             ctxMenu.classList.remove('hidden');
         });
 
-        // Скрываем меню при клике в любое другое место
         document.addEventListener('click', () => {
             ctxMenu.classList.add('hidden');
         });
 
-        // Кнопка кика внутри меню
         document.getElementById('btn-kick').addEventListener('click', () => {
             if (targetKickId) {
                 socket.emit('kick-user', targetKickId);
