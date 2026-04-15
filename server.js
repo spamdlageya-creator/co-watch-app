@@ -13,7 +13,7 @@ const userSockets = {};
 
 io.on('connection', (socket) => {
     socket.on('create-room', (adminName) => {
-        if (activeRooms[adminName]) return socket.emit('error-msg', 'Ник занят!');
+        if (activeRooms[adminName]) return socket.emit('error-msg', 'Комната с таким ником уже существует!');
         activeRooms[adminName] = { adminId: socket.id, users: {} };
         userSockets[socket.id] = { room: adminName, nick: adminName };
         socket.join(adminName);
@@ -21,8 +21,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('join-room', (adminName, userName) => {
-        if (!activeRooms[adminName]) return socket.emit('error-msg', 'Трансляция не найдена!');
-        if (Object.values(activeRooms[adminName].users).includes(userName)) return socket.emit('error-msg', 'Ник уже занят в этой комнате!');
+        if (!activeRooms[adminName]) return socket.emit('error-msg', 'Такой трансляции не существует!');
+        if (Object.values(activeRooms[adminName].users).includes(userName)) return socket.emit('error-msg', 'Этот ник уже занят в чате!');
 
         activeRooms[adminName].users[socket.id] = userName;
         userSockets[socket.id] = { room: adminName, nick: userName };
@@ -31,11 +31,11 @@ io.on('connection', (socket) => {
         socket.to(adminName).emit('user-joined', socket.id, userName);
     });
 
-    // ЛОГИКА КИКА (Только для админа)
+    // Логика кика
     socket.on('kick-user', (targetId) => {
         const info = userSockets[socket.id];
         if (info && activeRooms[info.room] && activeRooms[info.room].adminId === socket.id) {
-            io.to(targetId).emit('kicked-notice'); // Уведомляем бедолагу
+            io.to(targetId).emit('kicked-notice'); 
             const targetSocket = io.sockets.sockets.get(targetId);
             if (targetSocket) targetSocket.leave(info.room);
         }
@@ -47,6 +47,7 @@ io.on('connection', (socket) => {
         socket.to(room).emit('stream-cleared');
     });
 
+    // Изменили отправку сообщения, чтобы передавать ID для кика
     socket.on('chat-message', (room, userName, message) => {
         io.to(room).emit('chat-message', { id: socket.id, user: userName, text: message });
     });
@@ -59,7 +60,7 @@ io.on('connection', (socket) => {
                 socket.to(info.room).emit('user-left', info.nick);
                 if (activeRooms[info.room].adminId === socket.id) {
                     delete activeRooms[info.room];
-                    socket.to(info.room).emit('error-msg', 'Админ завершил стрим');
+                    socket.to(info.room).emit('error-msg', 'Админ завершил трансляцию (отключился).');
                 }
             }
             delete userSockets[socket.id];
@@ -67,4 +68,4 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(3000, () => console.log('Work on port 3000'));
+server.listen(3000, () => console.log('Сервер запущен на порту 3000'));
