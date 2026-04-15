@@ -3,137 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Co-Watch | Premium</title>
+    <title>Co-Watch | Совместный просмотр</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
     <style>
-        body { background: #0f172a; color: white; overflow: hidden; height: 100vh; font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        .chat-scroll::-webkit-scrollbar { width: 4px; }
-        .chat-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        #video-controls.v-hidden { opacity: 0; pointer-events: none; }
-        .msg-group { margin-top: 2px !important; }
+        #chat-messages::-webkit-scrollbar { width: 4px; }
+        #chat-messages::-webkit-scrollbar-thumb { background-color: #4B5563; border-radius: 4px; }
+        input[type=range] { accent-color: #6366f1; }
+        body { position: fixed; width: 100%; height: 100%; }
+        /* Класс для плавного скрытия интерфейса */
+        .fade-ui { transition: opacity 0.3s ease; }
+        .hidden-ui { opacity: 0 !important; pointer-events: none; }
     </style>
 </head>
-<body>
+<body class="bg-gray-900 text-white font-sans overflow-hidden" oncontextmenu="return false;"> <div id="ctx-menu" class="hidden fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-[200] py-1 text-sm">
+        <button id="btn-kick" class="w-full text-left px-4 py-2 text-red-400 hover:bg-gray-700 hover:text-red-300 font-bold">
+            <i class="fa-solid fa-ban mr-2"></i>Выгнать
+        </button>
+    </div>
 
-    <div id="toast-error" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[100] bg-red-500/90 text-white px-6 py-3 rounded-2xl shadow-2xl font-bold border border-white/20"></div>
+    <div id="toast-error" class="hidden fixed top-5 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-lg shadow-2xl z-[100] font-bold text-center w-11/12 max-w-md transition-all"></div>
 
-    <div id="login-screen" class="w-full h-full flex items-center justify-center p-6 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-900 to-black">
-        <div class="w-full max-w-sm glass p-8 rounded-[2rem] shadow-2xl">
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600 mb-4 shadow-lg shadow-indigo-500/50">
-                    <i class="fa-solid fa-play text-2xl"></i>
-                </div>
-                <h1 class="text-2xl font-black tracking-tight">CO-WATCH <span class="text-indigo-500">PRO</span></h1>
+    <div id="login-screen" class="w-full h-full flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-md bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700">
+            <h1 class="text-3xl font-bold mb-6 text-center text-indigo-400"><i class="fa-solid fa-popcorn mb-2 block text-4xl"></i>Co-Watch</h1>
+            
+            <div class="mb-4">
+                <input type="text" id="nickname" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-indigo-500 transition" placeholder="Ваш никнейм">
             </div>
-            
-            <input type="text" id="nickname" class="w-full mb-4 p-4 glass rounded-2xl outline-none focus:border-indigo-500 transition-all" placeholder="Твой ник">
-            
-            <button id="btn-create" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold transition-all shadow-lg active:scale-95 mb-6">
-                Создать комнату
+
+            <button id="btn-create" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition mb-4 shadow-lg">
+                <i class="fa-solid fa-tower-broadcast mr-2"></i> Создать трансляцию
             </button>
 
-            <div class="flex items-center gap-4 mb-6">
-                <div class="h-[1px] flex-grow bg-white/10"></div>
-                <span class="text-xs text-gray-500 font-bold uppercase tracking-widest">Или войти</span>
-                <div class="h-[1px] flex-grow bg-white/10"></div>
+            <div class="relative flex py-3 items-center">
+                <div class="flex-grow border-t border-gray-700"></div>
+                <span class="flex-shrink-0 mx-4 text-gray-500 text-sm font-medium">ИЛИ</span>
+                <div class="flex-grow border-t border-gray-700"></div>
             </div>
 
-            <input type="text" id="admin-nickname" class="w-full mb-4 p-4 glass rounded-2xl outline-none focus:border-emerald-500 transition-all" placeholder="Ник админа">
-            <button id="btn-join" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-bold transition-all shadow-lg active:scale-95">
-                Смотреть вместе
+            <div class="mb-4 mt-2">
+                <input type="text" id="admin-nickname" class="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-green-500 transition" placeholder="Никнейм админа">
+            </div>
+
+            <button id="btn-join" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-lg">
+                <i class="fa-solid fa-right-to-bracket mr-2"></i> Присоединиться
             </button>
         </div>
     </div>
 
-    <div id="room-screen" class="hidden h-full flex flex-col md:flex-row">
-        <div id="video-container" class="relative flex-grow bg-black flex flex-col h-[40vh] md:h-full overflow-hidden">
-            <div id="ui-top" class="absolute top-0 w-full p-4 flex justify-between items-center z-20 transition-opacity duration-500">
-                <div id="room-badge" class="glass px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div> <span id="room-id-text">ROOM</span>
-                </div>
-                <button id="btn-share" class="hidden bg-indigo-600 px-5 py-2 rounded-full text-sm font-black shadow-xl shadow-indigo-500/20 active:scale-90 transition-all">
-                    ТРАНСЛЯЦИЯ
+    <div id="room-screen" class="hidden w-full h-full flex flex-col md:flex-row">
+        
+        <div id="video-container" class="relative flex-grow bg-black flex flex-col h-[50vh] md:h-full group">
+            
+            <div id="ui-top" class="fade-ui absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 to-transparent z-10 flex justify-between items-center opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                <div id="room-info" class="bg-gray-800/80 backdrop-blur px-3 py-1.5 rounded-md text-sm font-medium border border-gray-600"></div>
+                <button id="btn-share" class="hidden bg-indigo-600 hover:bg-indigo-500 text-sm px-4 py-2 rounded-md font-bold transition shadow-lg">
+                    <i class="fa-solid fa-display mr-2"></i>Транслировать
                 </button>
             </div>
-
-            <video id="video-player" class="w-full h-full object-contain" playsinline autoplay></video>
-
-            <div id="waiting-text" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 bg-slate-900/50">
-                <i class="fa-solid fa-ghost text-5xl mb-4 animate-bounce"></i>
-                <p class="font-bold tracking-widest text-sm">ЖДЕМ ЭФИР...</p>
+            
+            <video id="video-player" class="w-full h-full object-contain" autoplay playsinline></video>
+            
+            <div id="waiting-text" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500 pointer-events-none">
+                <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-3 text-indigo-500"></i>
+                <span class="text-lg font-medium">Ожидание трансляции...</span>
             </div>
 
-            <div id="video-controls" class="absolute bottom-6 right-6 flex items-center gap-4 z-20 transition-opacity duration-500">
-                <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1" class="w-20 accent-indigo-500">
-                <button id="btn-fullscreen" class="glass w-12 h-12 rounded-full hover:bg-white/10 transition-colors">
+            <div id="video-controls" class="fade-ui hidden absolute bottom-0 left-0 w-full p-4 bg-gradient-to-t from-black/90 to-transparent z-10 flex items-center justify-end gap-4 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                <div id="volume-control" class="flex items-center gap-2 bg-gray-800/80 backdrop-blur px-3 py-1.5 rounded-full border border-gray-600">
+                    <i class="fa-solid fa-volume-high text-sm text-gray-300"></i>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1" class="w-20 md:w-24 cursor-pointer">
+                </div>
+                <button id="btn-fullscreen" class="bg-gray-800/80 hover:bg-gray-700 backdrop-blur p-2.5 rounded-full border border-gray-600 transition text-gray-200">
                     <i class="fa-solid fa-expand"></i>
                 </button>
             </div>
         </div>
 
-        <div class="w-full md:w-80 lg:w-96 flex flex-col glass border-none m-2 rounded-[1.5rem] overflow-hidden">
-            <div class="p-4 border-b border-white/5 flex items-center gap-2">
-                <i class="fa-solid fa-comment-dots text-indigo-500"></i>
-                <span class="font-bold text-sm tracking-tight">LIVE CHAT</span>
+        <div class="w-full h-[50vh] md:h-full md:w-80 lg:w-96 bg-gray-800 flex flex-col border-t md:border-t-0 md:border-l border-gray-700">
+            <div class="p-3 bg-gray-900 border-b border-gray-700 flex items-center gap-2 shrink-0">
+                <i class="fa-regular fa-comments text-indigo-400"></i>
+                <span class="font-bold text-sm">Чат</span>
             </div>
             
-            <div id="chat-messages" class="flex-grow p-4 overflow-y-auto chat-scroll flex flex-col gap-1"></div>
+            <div id="chat-messages" class="flex-grow p-4 overflow-y-auto flex flex-col gap-3 pb-20 md:pb-4 relative"></div>
 
-            <form id="chat-form" class="p-4 bg-black/20">
-                <div class="relative">
-                    <input type="text" id="chat-input" class="w-full p-3 pl-4 pr-12 glass rounded-xl text-sm focus:border-indigo-500 outline-none transition-all" placeholder="Твое сообщение..." autocomplete="off">
-                    <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-500 p-2">
+            <div class="p-3 bg-gray-900 border-t border-gray-700 shrink-0">
+                <form id="chat-form" class="flex gap-2 relative">
+                    <input type="text" id="chat-input" class="flex-grow p-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm focus:outline-none focus:border-indigo-500 transition pr-10" placeholder="Написать..." autocomplete="off">
+                    <button type="submit" class="absolute right-1 top-1 bottom-1 text-indigo-400 hover:text-indigo-300 p-2 rounded transition">
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 
     <script>
         const socket = io();
-        let myName = localStorage.getItem('co_watch_nick') || '';
+        let myName = localStorage.getItem('savedNickname') || '';
         if (myName) document.getElementById('nickname').value = myName;
-
+        
         let roomName = '';
         let isAdmin = false;
         let localStream = null;
         let lastMsgAuthor = null;
         const peers = {};
 
-        // UI Helpers
+        const webRtcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        const loginScreen = document.getElementById('login-screen');
+        const roomScreen = document.getElementById('room-screen');
+        const videoPlayer = document.getElementById('video-player');
+        const chatMessages = document.getElementById('chat-messages');
+
+        // --- УВЕДОМЛЕНИЯ ---
         function showError(msg) {
-            const t = document.getElementById('toast-error');
-            t.innerText = msg; t.classList.remove('hidden');
-            setTimeout(() => t.classList.add('hidden'), 4000);
+            const toast = document.getElementById('toast-error');
+            toast.innerText = msg; toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 5000);
         }
+        socket.on('error-msg', (msg) => {
+            showError(msg);
+            if(msg.includes('завершил') || msg.includes('не существует')) setTimeout(() => window.location.reload(), 3000);
+        });
+        socket.on('kicked-notice', () => {
+            alert('Вас выгнали из комнаты.');
+            window.location.reload();
+        });
 
-        // --- MOBILE AUTO-HIDE CONTROLS ---
+        // --- MOBILE UI AUTO-HIDE ---
         let uiTimeout;
-        const vControls = document.getElementById('video-controls');
-        const vTop = document.getElementById('ui-top');
+        const uiTop = document.getElementById('ui-top');
+        const uiBot = document.getElementById('video-controls');
         
-        function showUI() {
-            vControls.classList.remove('v-hidden');
-            vTop.classList.remove('v-hidden');
+        function resetUiTimer() {
+            uiTop.classList.remove('hidden-ui');
+            uiBot.classList.remove('hidden-ui');
             clearTimeout(uiTimeout);
-            uiTimeout = setTimeout(() => {
-                vControls.classList.add('v-hidden');
-                vTop.classList.add('v-hidden');
-            }, 3000);
+            // Прячем через 3 секунды, если экран мобильный или развернут на весь экран
+            if (window.innerWidth < 768 || document.fullscreenElement) {
+                uiTimeout = setTimeout(() => {
+                    uiTop.classList.add('hidden-ui');
+                    uiBot.classList.add('hidden-ui');
+                }, 3000);
+            }
         }
-        document.getElementById('video-container').addEventListener('mousemove', showUI);
-        document.getElementById('video-container').addEventListener('touchstart', showUI);
+        document.getElementById('video-container').addEventListener('mousemove', resetUiTimer);
+        document.getElementById('video-container').addEventListener('touchstart', resetUiTimer);
 
-        // --- LOGIC ---
+        // --- ВХОД ---
         document.getElementById('btn-create').addEventListener('click', () => {
             myName = document.getElementById('nickname').value.trim();
-            if (!myName) return showError('Введи ник!');
-            localStorage.setItem('co_watch_nick', myName);
+            if (!myName) return showError('Введите ваш ник!');
+            localStorage.setItem('savedNickname', myName); 
             isAdmin = true; roomName = myName;
             socket.emit('create-room', roomName);
         });
@@ -141,20 +172,25 @@
         document.getElementById('btn-join').addEventListener('click', () => {
             myName = document.getElementById('nickname').value.trim();
             roomName = document.getElementById('admin-nickname').value.trim();
-            if (!myName || !roomName) return showError('Заполни поля!');
-            localStorage.setItem('co_watch_nick', myName);
+            if (!myName || !roomName) return showError('Заполните поля!');
+            localStorage.setItem('savedNickname', myName); 
             isAdmin = false;
             socket.emit('join-room', roomName, myName);
         });
 
-        socket.on('room-ready', (isC) => {
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('room-screen').classList.remove('hidden');
-            document.getElementById('room-id-text').innerText = roomName.toUpperCase();
-            if (isC) document.getElementById('btn-share').classList.remove('hidden');
+        socket.on('room-ready', (isCreator) => {
+            loginScreen.classList.add('hidden');
+            roomScreen.classList.remove('hidden');
+            document.getElementById('room-info').innerHTML = `<i class="fa-solid fa-users mr-2 text-indigo-400"></i> ${roomName}`;
+            if (isCreator) {
+                document.getElementById('btn-share').classList.remove('hidden');
+                document.getElementById('volume-control').classList.add('hidden');
+                videoPlayer.muted = true;
+            }
+            resetUiTimer();
         });
 
-        // Исправление бага залагавшего экрана
+        // --- ТРАНСЛЯЦИЯ (Очистка зависшего кадра) ---
         async function stopMyStream() {
             if (localStream) {
                 localStream.getTracks().forEach(t => t.stop());
@@ -165,24 +201,79 @@
 
         document.getElementById('btn-share').addEventListener('click', async () => {
             try {
-                if (localStream) await stopMyStream();
-                localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                document.getElementById('video-player').srcObject = localStream;
-                document.getElementById('waiting-text').classList.add('hidden');
+                if (localStream) await stopMyStream(); // Останавливаем старый перед выбором нового
                 
-                // Переподключение всех пиров при смене экрана
+                localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                videoPlayer.srcObject = localStream;
+                document.getElementById('waiting-text').classList.add('hidden');
+                document.getElementById('btn-share').classList.add('hidden');
+                uiBot.classList.remove('hidden');
+
+                // Если уже есть зрители, заменяем им трек на лету
                 Object.keys(peers).forEach(id => {
-                    peers[id].replaceTrack(peers[id].streams[0].getVideoTracks()[0], localStream.getVideoTracks()[0], peers[id].streams[0]);
+                    if (peers[id] && !peers[id].destroyed) {
+                        try { peers[id].replaceTrack(peers[id].streams[0].getVideoTracks()[0], localStream.getVideoTracks()[0], peers[id].streams[0]); } catch(e){}
+                    }
                 });
-            } catch (e) { showError('Ошибка доступа'); }
+
+                localStream.getVideoTracks()[0].onended = () => {
+                    stopMyStream();
+                    document.getElementById('btn-share').classList.remove('hidden');
+                    uiBot.classList.add('hidden');
+                    document.getElementById('waiting-text').classList.remove('hidden');
+                    videoPlayer.srcObject = null;
+                };
+            } catch (err) {
+                console.log(err);
+            }
         });
 
         socket.on('stream-cleared', () => {
-            document.getElementById('video-player').srcObject = null;
+            videoPlayer.srcObject = null;
             document.getElementById('waiting-text').classList.remove('hidden');
+            uiBot.classList.add('hidden');
         });
 
-        // --- ЧАТ И ГРУППИРОВКА ---
+        // Управление UI видео
+        document.getElementById('volume-slider').addEventListener('input', (e) => videoPlayer.volume = e.target.value);
+        document.getElementById('btn-fullscreen').addEventListener('click', () => {
+            const vc = document.getElementById('video-container');
+            if (!document.fullscreenElement) vc.requestFullscreen().catch(e => {});
+            else document.exitFullscreen();
+        });
+
+        // --- WEBRTC ---
+        socket.on('user-joined', (userId, userName) => {
+            addSystemMessage(`${userName} присоединился к просмотру`);
+            if (isAdmin && localStream) {
+                const peer = new SimplePeer({ initiator: true, stream: localStream, trickle: true, config: webRtcConfig });
+                peer.on('signal', signalData => socket.emit('signal', userId, signalData));
+                peers[userId] = peer;
+            }
+        });
+
+        socket.on('user-left', (userName) => addSystemMessage(`${userName} покинул трансляцию`, 'text-red-400'));
+
+        let peerForViewer = null;
+        socket.on('signal', (fromId, signalData) => {
+            if (isAdmin) {
+                if (peers[fromId]) peers[fromId].signal(signalData);
+            } else {
+                if (!peerForViewer) {
+                    peerForViewer = new SimplePeer({ initiator: false, trickle: true, config: webRtcConfig });
+                    peerForViewer.on('signal', signalData => socket.emit('signal', fromId, signalData));
+                    peerForViewer.on('stream', stream => {
+                        videoPlayer.srcObject = stream;
+                        document.getElementById('waiting-text').classList.add('hidden');
+                        uiBot.classList.remove('hidden');
+                        videoPlayer.play().catch(e => addSystemMessage("Нажмите на видео, чтобы включить звук", "text-yellow-400"));
+                    });
+                }
+                peerForViewer.signal(signalData);
+            }
+        });
+
+        // --- ЧАТ (Группировка) ---
         document.getElementById('chat-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const input = document.getElementById('chat-input');
@@ -193,77 +284,81 @@
         });
 
         socket.on('chat-message', (data) => {
-            const container = document.getElementById('chat-messages');
             const isMe = data.user === myName;
-            let msgHTML = '';
-
-            if (lastMsgAuthor === data.user) {
-                // Группировка (без ника)
-                const lastMsgBlock = container.lastElementChild.querySelector('.msg-content');
-                const newText = document.createElement('p');
-                newText.className = "text-sm mt-1 opacity-90";
+            
+            // Если пишет тот же человек, добавляем текст в старый блок
+            if (lastMsgAuthor === data.user && chatMessages.lastElementChild && chatMessages.lastElementChild.classList.contains('chat-msg-block')) {
+                const contentBox = chatMessages.lastElementChild.querySelector('.msg-content');
+                const newText = document.createElement('div');
+                newText.className = `mt-1 pt-1 border-t ${isMe ? 'border-indigo-500' : 'border-gray-600'}`;
                 newText.innerText = data.text;
-                lastMsgBlock.appendChild(newText);
+                contentBox.appendChild(newText);
             } else {
-                // Новое сообщение с ником
+                // Иначе создаем новый блок (с data-атрибутами для кика)
                 const div = document.createElement('div');
-                div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} mb-2`;
-                
-                // Кнопка кика для админа
-                const kickBtn = (isAdmin && !isMe) ? `<button onclick="socket.emit('kick-user', '${data.id}')" class="ml-2 text-red-500 text-[10px] opacity-50 hover:opacity-100">KICK</button>` : '';
+                div.className = `chat-msg-block flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
+                div.dataset.id = data.id;
+                div.dataset.user = data.user;
 
                 div.innerHTML = `
-                    <div class="flex items-center">
-                        <span class="text-[10px] font-black text-gray-500 uppercase mb-1">${data.user}</span>
-                        ${kickBtn}
-                    </div>
-                    <div class="msg-content glass p-3 rounded-2xl ${isMe ? 'rounded-tr-none bg-indigo-600/40' : 'rounded-tl-none bg-white/5'}">
-                        <p class="text-sm opacity-90">${data.text}</p>
+                    <span class="text-[10px] mb-1 ${isMe ? 'text-indigo-400' : 'text-emerald-400'} font-bold uppercase">${data.user}</span>
+                    <div class="msg-content px-3 py-2 rounded-lg max-w-[90%] break-words ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-gray-700 text-gray-200 rounded-bl-none'}">
+                        <div>${data.text}</div>
                     </div>
                 `;
-                container.appendChild(div);
+                chatMessages.appendChild(div);
             }
             
             lastMsgAuthor = data.user;
-            container.scrollTop = container.scrollHeight;
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         });
 
-        socket.on('kicked-notice', () => {
-            alert('Вас кикнули из комнаты');
-            window.location.reload();
+        function addSystemMessage(text, colorClass = 'text-gray-400') {
+            lastMsgAuthor = null; // Сбрасываем группировку после системного сообщения
+            const div = document.createElement('div');
+            div.className = "flex justify-center my-1";
+            div.innerHTML = `<span class="bg-gray-700/50 ${colorClass} text-[10px] px-3 py-1 rounded-full text-center uppercase font-bold">${text}</span>`;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // --- КОНТЕКСТНОЕ МЕНЮ ДЛЯ КИКА ---
+        let targetKickId = null;
+        const ctxMenu = document.getElementById('ctx-menu');
+
+        chatMessages.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); // Убираем стандартное меню браузера
+            if (!isAdmin) return; // Меню кика только для админа
+
+            const msgBlock = e.target.closest('.chat-msg-block');
+            if (!msgBlock) return;
+
+            const id = msgBlock.dataset.id;
+            const user = msgBlock.dataset.user;
+            
+            if (id === socket.id || user === myName) return; // Себя кикнуть нельзя
+
+            targetKickId = id;
+            
+            // Позиционируем меню
+            ctxMenu.style.top = `${e.clientY}px`;
+            ctxMenu.style.left = `${e.clientX}px`;
+            ctxMenu.classList.remove('hidden');
         });
 
-        // WebRTC Сигналинг (как в прошлой версии)
-        socket.on('user-joined', (id, name) => {
-            if (isAdmin && localStream) {
-                const peer = new SimplePeer({ initiator: true, stream: localStream, trickle: true });
-                peer.on('signal', s => socket.emit('signal', id, s));
-                peers[id] = peer;
+        // Скрываем меню при клике в любое другое место
+        document.addEventListener('click', () => {
+            ctxMenu.classList.add('hidden');
+        });
+
+        // Кнопка кика внутри меню
+        document.getElementById('btn-kick').addEventListener('click', () => {
+            if (targetKickId) {
+                socket.emit('kick-user', targetKickId);
+                ctxMenu.classList.add('hidden');
             }
         });
 
-        socket.on('signal', (from, data) => {
-            if (isAdmin) {
-                if (peers[from]) peers[from].signal(data);
-            } else {
-                if (!window.viewerPeer) {
-                    window.viewerPeer = new SimplePeer({ initiator: false, trickle: true });
-                    window.viewerPeer.on('signal', s => socket.emit('signal', from, s));
-                    window.viewerPeer.on('stream', st => {
-                        document.getElementById('video-player').srcObject = st;
-                        document.getElementById('waiting-text').classList.add('hidden');
-                    });
-                }
-                window.viewerPeer.signal(data);
-            }
-        });
-
-        // Глобальные функции
-        document.getElementById('btn-fullscreen').onclick = () => {
-            const el = document.getElementById('video-container');
-            if (!document.fullscreenElement) el.requestFullscreen();
-            else document.exitFullscreen();
-        };
     </script>
 </body>
 </html>
